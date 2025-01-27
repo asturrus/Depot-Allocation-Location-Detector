@@ -37,8 +37,11 @@ with st.form("my_form", clear_on_submit=True):
     uploaded_files = st.file_uploader(
         "Select a CSV, GeoJson, ShapeFile file(s)", accept_multiple_files=True, type=['geojson', 'csv', 'shp']
     )
+
     for uploaded_file in uploaded_files:
         file_extension = (Path(uploaded_file.name).suffix)
+
+        # If the file is CSV Type
 
         if file_extension == '.csv' :
             try:
@@ -54,12 +57,14 @@ with st.form("my_form", clear_on_submit=True):
             except Exception as e:
                 st.error(f"Error reading CSV file: {e}")
 
+        # If the file is Shapefile Type
 
         # elif file_extension == '.shp' :
         #     data = gpd.read_file(uploaded_file)
         #     data.to_csv('output.csv', index=False)
         #     coordinates = 'output.csv'
 
+        # If the file is GeoJSON Type
 
         elif file_extension == '.geojson' :
             try:
@@ -75,11 +80,6 @@ with st.form("my_form", clear_on_submit=True):
             except Exception as e:
                 st.error(f"Error reading GeoJSON file: {e}")
 
-
-
-
-    # st.write("Filename:", uploaded_file.name)
-    # st.write(Path(uploaded_file.name).suffix)
 
     submitted = st.form_submit_button("Upload")
 
