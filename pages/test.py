@@ -48,13 +48,16 @@ with st.form("my_form", clear_on_submit=True):
 
                     # Ensure geometry exists and extract coordinates
                     if gdf.geometry is not None:
-                        gdf['longitude'] = gdf.geometry.x
-                        gdf['latitude'] = gdf.geometry.y
+                        # Convert all geometries to (latitude, longitude) points
+                        gdf["latitude"] = gdf.geometry.apply(lambda geom: geom.centroid.y)
+                        gdf["longitude"] = gdf.geometry.apply(lambda geom: geom.centroid.x)
+
+                        # Store extracted coordinates
                         coordinates = gdf[['latitude', 'longitude']]
                         all_coordinates.append(coordinates)
-                        st.success(f"Shapefile '{uploaded_file.name}' successfully processed!")
+                        st.success(f"{file_extension.upper()} file '{uploaded_file.name}' processed successfully!")
                     else:
-                        st.error(f"The Shapefile '{uploaded_file.name}' must contain valid geometry data.")
+                        st.error(f"{file_extension.upper()} file '{uploaded_file.name}' must contain valid geometry data.")
 
                 except Exception as e:
                     st.error(f"Error reading Shapefile '{uploaded_file.name}': {e}")
@@ -66,13 +69,16 @@ with st.form("my_form", clear_on_submit=True):
 
                     # Ensure geometry exists and extract coordinates
                     if gdf.geometry is not None:
-                        gdf['longitude'] = gdf.geometry.x
-                        gdf['latitude'] = gdf.geometry.y
+                        # Convert all geometries to (latitude, longitude) points
+                        gdf["latitude"] = gdf.geometry.apply(lambda geom: geom.centroid.y)
+                        gdf["longitude"] = gdf.geometry.apply(lambda geom: geom.centroid.x)
+
+                        # Store extracted coordinates
                         coordinates = gdf[['latitude', 'longitude']]
                         all_coordinates.append(coordinates)
-                        st.success(f"GeoJSON file '{uploaded_file.name}' successfully processed!")
+                        st.success(f"{file_extension.upper()} file '{uploaded_file.name}' processed successfully!")
                     else:
-                        st.error(f"The GeoJSON file '{uploaded_file.name}' must contain valid geometry data.")
+                        st.error(f"{file_extension.upper()} file '{uploaded_file.name}' must contain valid geometry data.")
 
                 except Exception as e:
                     st.error(f"Error reading GeoJSON file '{uploaded_file.name}': {e}")
