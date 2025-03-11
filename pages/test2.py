@@ -6,6 +6,28 @@ from sklearn.cluster import KMeans
 import leafmap.foliumap as leafmap
 from folium.plugins import MarkerCluster
 import folium
+from db_config import collection  # MongoDB Connection
+
+# Set page configuration (must be at the top of the file)
+# st.set_page_config(layout="wide")
+
+# Sidebar and Header Content
+st.sidebar.title("About")
+st.sidebar.info("TBD TO WRITE LATER ON")
+
+st.title("Depot Allocation Location Detector")
+
+st.header("Instructions")
+st.markdown("""
+1. Input a media file or media files containing 'latitude' and 'longitude' information
+2. The Depot Allocation Location Detector will parse the data files
+3. Following the parsing, the data will be displayed via various GeoSpatial Maps
+4. Option to view parsed data on Cluster map, Heat map, and Priority Chart
+""")
+
+result = collection.delete_many({})
+st.write(f"{result.deleted_count} documents deleted.")
+
 
 # Initialize session state
 if "all_coordinates" not in st.session_state:
@@ -17,7 +39,8 @@ if "cluster_centers" not in st.session_state:
 if "priority_list" not in st.session_state:
     st.session_state.priority_list = None  # Store priority list (coordinates + clusters)
 
-with st.form("my_form", clear_on_submit=True):
+# ---- Upload Files ----
+with st.form("upload_form", clear_on_submit=True):
     uploaded_files = st.file_uploader(
         "Select a CSV, GeoJSON, or Shapefile file(s)",
         accept_multiple_files=True,
@@ -66,7 +89,7 @@ with st.form("my_form", clear_on_submit=True):
         else:
             st.error("No valid coordinates found.")
 
-# Clustering
+# ---- Clustering ----
 if st.session_state.all_coordinates is not None:
     st.divider()
     st.write("Data Uploaded Successfully!")
@@ -94,6 +117,11 @@ if st.session_state.all_coordinates is not None:
             priority_list['Priority'] = priority_list['Cluster'].rank(method="first")
             st.session_state.priority_list = priority_list
 
+            # Save clustered data to MongoDB
+            cluster_data = st.session_state.all_coordinates.to_dict(orient="records")
+            collection.insert_many(cluster_data)  # Save clustered data
+            st.success("Clustering complete and data saved to MongoDB!")
+
             # Create cluster map
             m = leafmap.Map(minimap_control=True)
             marker_cluster = MarkerCluster().add_to(m)
@@ -107,26 +135,26 @@ if st.session_state.all_coordinates is not None:
 
             st.session_state.cluster_map = m
 
-            st.success("Clustering complete!")
-
-            # Navigation Buttons
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("View Cluster Map"):
-                    st.switch_page("pages/clustermap.py")
-
-            with col2:
-                if st.button("View Priority List"):
-                    st.switch_page("pages/priority_list.py")
-
         except ValueError as e:
             st.error(f"Error during clustering: {e}")
 
+# ---- View Saved Data ----
+if st.button("View Saved Clusters"):
+    st.subheader("Saved Clustered Data from Database")
+    saved_data = list(collection.find({}, {"_id": 0}))  # Exclude MongoDB _id
+    if saved_data:
+        df_saved = pd.DataFrame(saved_data)
+        st.dataframe(df_saved)
+    else:
+        st.warning("No clustered data found in database.")
 
-st.header("Ex")
-
-example_m = leafmap.Map(minimap_control=True)
-example_m.add_basemap("OpenTopoMap")
-
-example_m.to_streamlit(height=700)
+# ---- Navigation for Cluster Map & Priority List ----
+st.divider()
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("View Cluster Map"):
+        st.switch_page("pages/Clustermap.py")
+with col2:
+    if st.button("View Priority List"):
+        st.switch_page("pages/Priority List.py")
 
