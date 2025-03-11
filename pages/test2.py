@@ -25,8 +25,8 @@ st.markdown("""
 4. Option to view parsed data on Cluster map, Heat map, and Priority Chart
 """)
 
-result = collection.delete_many({})
-st.write(f"{result.deleted_count} documents deleted.")
+# result = collection.delete_many({})
+# st.write(f"{result.deleted_count} documents deleted.")
 
 
 # Initialize session state
