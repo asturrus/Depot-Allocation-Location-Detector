@@ -29,7 +29,7 @@ st.markdown("""
 # st.write(f"{result.deleted_count} documents deleted.")
 
 
-# Initialize session state
+# ---- Initialize session state ----
 if "all_coordinates" not in st.session_state:
     st.session_state.all_coordinates = None
 if "cluster_map" not in st.session_state:
@@ -102,6 +102,42 @@ if st.session_state.all_coordinates is not None:
         step=1
     )
 
+    # if st.button("Perform Clustering"):
+    #     try:
+    #         kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    #         st.session_state.all_coordinates['Cluster'] = kmeans.fit_predict(
+    #             st.session_state.all_coordinates[['latitude', 'longitude']]
+    #         )
+
+    #         cluster_centers = kmeans.cluster_centers_
+    #         st.session_state.cluster_centers = pd.DataFrame(cluster_centers, columns=['latitude', 'longitude'])
+
+    #         # Create Priority List (Combined Coordinates + Cluster Centers)
+    #         priority_list = st.session_state.all_coordinates.copy()
+    #         priority_list['Priority'] = priority_list['Cluster'].rank(method="first")
+    #         st.session_state.priority_list = priority_list
+
+    #         # Save clustered data to MongoDB
+    #         cluster_data = st.session_state.all_coordinates.to_dict(orient="records")
+    #         collection.insert_many(cluster_data)  # Save clustered data
+    #         st.success("Clustering complete and data saved to MongoDB!")
+
+    #         # Create cluster map
+    #         m = leafmap.Map(minimap_control=True)
+    #         marker_cluster = MarkerCluster().add_to(m)
+
+    #         for center in cluster_centers:
+    #             folium.Marker(location=[center[0], center[1]], popup="Cluster Center").add_to(marker_cluster)
+
+    #         for _, row in st.session_state.all_coordinates.iterrows():
+    #             folium.CircleMarker(location=[row['latitude'], row['longitude']], radius=5, color="blue",
+    #                                 fill=True, fill_opacity=0.6).add_to(m)
+
+    #         st.session_state.cluster_map = m
+
+    #     except ValueError as e:
+    #         st.error(f"Error during clustering: {e}")
+
     if st.button("Perform Clustering"):
         try:
             kmeans = KMeans(n_clusters=num_clusters, random_state=42)
@@ -112,17 +148,12 @@ if st.session_state.all_coordinates is not None:
             cluster_centers = kmeans.cluster_centers_
             st.session_state.cluster_centers = pd.DataFrame(cluster_centers, columns=['latitude', 'longitude'])
 
-            # Create Priority List (Combined Coordinates + Cluster Centers)
+            # ---- Create Priority List ----
             priority_list = st.session_state.all_coordinates.copy()
             priority_list['Priority'] = priority_list['Cluster'].rank(method="first")
             st.session_state.priority_list = priority_list
 
-            # Save clustered data to MongoDB
-            cluster_data = st.session_state.all_coordinates.to_dict(orient="records")
-            collection.insert_many(cluster_data)  # Save clustered data
-            st.success("Clustering complete and data saved to MongoDB!")
-
-            # Create cluster map
+            # ---- Create cluster map ----
             m = leafmap.Map(minimap_control=True)
             marker_cluster = MarkerCluster().add_to(m)
 
@@ -135,18 +166,67 @@ if st.session_state.all_coordinates is not None:
 
             st.session_state.cluster_map = m
 
+
+            # ---- Group by cluster and prepare for MongoDB ----
+            grouped_data = []
+
+            for cluster_num in range(num_clusters):
+                cluster_coords = st.session_state.all_coordinates[
+                    st.session_state.all_coordinates['Cluster'] == cluster_num
+                ][['latitude', 'longitude']].to_dict(orient='records')
+
+                cluster_entry = {
+                    "cluster": int(cluster_num),
+                    "center": {
+                        "latitude": float(cluster_centers[cluster_num][0]),
+                        "longitude": float(cluster_centers[cluster_num][1])
+                    },
+                    "cities": cluster_coords
+                }
+
+                grouped_data.append(cluster_entry)
+
+            # ---- Save grouped data to MongoDB ----
+            collection.insert_many(grouped_data)
+
+            st.success("Clustering complete and saved to database!")
+
         except ValueError as e:
             st.error(f"Error during clustering: {e}")
 
+
 # ---- View Saved Data ----
+# if st.button("View Saved Clusters"):
+#     st.subheader("Saved Clustered Data from Database")
+#     saved_data = list(collection.find({}, {"_id": 0}))  # Exclude MongoDB _id
+#     if saved_data:
+#         df_saved = pd.DataFrame(saved_data)
+#         st.dataframe(df_saved)
+#     else:
+#         st.warning("No clustered data found in database.")
+
 if st.button("View Saved Clusters"):
-    st.subheader("Saved Clustered Data from Database")
+    st.subheader("📍 Saved Clustered Data from Database")
     saved_data = list(collection.find({}, {"_id": 0}))  # Exclude MongoDB _id
+
     if saved_data:
-        df_saved = pd.DataFrame(saved_data)
-        st.dataframe(df_saved)
+        for idx, doc in enumerate(saved_data):
+            cluster = doc["center"]
+            cities = doc["cities"]
+
+            st.markdown(f"## 🏠 Cluster {idx+1}")
+            st.write(f"**Cluster Center:** Latitude: `{cluster['latitude']}`, Longitude: `{cluster['longitude']}`")
+
+            if cities:
+                df_cities = pd.DataFrame(cities)
+                st.markdown("### 🏙 Cities Assigned to This Cluster:")
+                st.dataframe(df_cities)
+            else:
+                st.warning("No cities assigned to this cluster.")
+
     else:
-        st.warning("No clustered data found in database.")
+        st.warning("No clustered data found in the database.")
+
 
 # ---- Navigation for Cluster Map & Priority List ----
 st.divider()
